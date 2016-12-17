@@ -12,14 +12,14 @@
 #define STATE_PIN_MISSING -1
 
 // misc
-#define SERIAL_TIMEOUT 60000 // 1 min
 #define SERIAL_BAUD 9600
+#define SERIAL_TIMEOUT 60000 // 1 min
 #define BLE_BAUD 9600 // for at mode and for data mode (CC41 and HM-10)
 #define BLE_TIMEOUT 100
 #define INITIAL_DELAY 200
 
 enum ModuleType { HM10, CC41, Unknown };
-enum Operation {Quit, SetName, SetPass, SetStateBehavior, DisplayMainSettings};
+enum Operation {Quit, SetName, SetPass, SetStateBehavior, SetPower, DisplayMainSettings};
 
 /// State
 SoftwareSerial * ble = NULL; // supports modules conencted over software serial. no current support for Serial2, etc.
@@ -67,6 +67,9 @@ void setup()
 			break;
 		case SetStateBehavior:
 			setStateBehavior();
+			break;
+		case SetPower:
+			setPower();
 			break;
 		case DisplayMainSettings:
 			displayMainSettings();
@@ -194,6 +197,7 @@ void displayMainSettings()
 		doCommandAndEchoResult(("AT+PASS?"));
 		doCommandAndEchoResult(("AT+ADDR?"));
 		doCommandAndEchoResult(("AT+ROLE?"), F("Peripheral=0, Central=1"));
+		doCommandAndEchoResult(("AT+POWE?"), F("0 = -23dbm, 1 = -6dbm, 2 = 0dbm, 3 = 6dbm"));
 		doCommandAndEchoResult(("AT+MODE?"), F("Transmission Mode=0, PIO collection Mode=1, Remote Control Mode=2"));
 		doCommandAndEchoResult(("AT+PIO1?"), F("Behavior of state pin, Blink on disconnect=0, Off on disconnect=1"));
 	}
@@ -205,6 +209,7 @@ void displayMainSettings()
 		doCommandAndEchoResult(("AT+PASS"));
 		doCommandAndEchoResult(("AT+ADDR"));
 		doCommandAndEchoResult(("AT+ROLE"));
+		doCommandAndEchoResult(("AT+POWE"), F("0 = -23dbm, 1 = -6dbm, 2 = 0dbm, 3 = 6dbm"));
 	}
 }
 
@@ -215,7 +220,8 @@ Operation getMenuSelection()
 	Serial.println(F("2) Set module password"));
 	if(moduleType==HM10)
 		Serial.println(F("3) Set module state pin behavior"));
-	Serial.println(F("4) Display main settings"));
+	Serial.println(F("4) Set module power"));
+	Serial.println(F("5) Display main settings"));
 	int op = readInt(F("Enter menu selection"), 0);
 	return (Operation)(op);
 }
@@ -243,6 +249,14 @@ void setStateBehavior()
 	command += val;
 	doCommandAndEchoResult(command.c_str());
 	doCommandAndEchoResult("AT+RESET", F("to apply the AT+PIO1 command"));
+}
+
+void setPower()
+{
+	int dbm = readInt(F("Enter new module power (0 = -23dbm, 1 = -6dbm, 2 = 0dbm, 3 = 6dbm)"), 2); // 2 is the default
+	String command(F("AT+POWE"));
+	command += dbm;
+	doCommandAndEchoResult(command.c_str());
 }
 
 /// Interface helper functions
