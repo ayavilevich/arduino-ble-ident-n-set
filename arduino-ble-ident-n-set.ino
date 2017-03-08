@@ -14,11 +14,11 @@
 // misc
 #define SERIAL_BAUD 9600
 #define SERIAL_TIMEOUT 60000 // 1 min
-#define BLE_BAUD 9600 // for at mode and for data mode (CC41 and HM-10)
-#define BLE_TIMEOUT 100
+#define BLE_BAUD 9600 // for at mode and for data mode (CC41, HM-10 and BT05)
+#define BLE_TIMEOUT 250 // 100 was ok for CC41 and HM-10 but not for BT05's AT+HELP command
 #define INITIAL_DELAY 200
 
-enum ModuleType { HM10, CC41, Unknown };
+enum ModuleType { HM10, CC41, BT05, Unknown };
 enum Operation {Quit, SetName, SetPass, SetStateBehavior, SetPower, DisplayMainSettings};
 
 /// State
@@ -160,16 +160,33 @@ ModuleType identifyDevice()
 		s = ble->readString();
 		if (s.length() == 4 && s.compareTo("OK\r\n") == 0)
 		{
-			Serial.println(F("CC41 detected!")); // A HM-10 clone
+			Serial.println(F("CC41 detected!")); // An HM-10 clone
 			return CC41;
 		}
 		else if (s.length() == 0)
 		{
-			Serial.println(F("No response received from module."));
-			Serial.println(F("Verify that the module is powered. Is the led blinking?"));
-			Serial.println(F("Check that pins are correctly connected and the right values were entered."));
-			Serial.println(F("Are you using a logic voltage converter for a module that already has such logic on board?"));
-			Serial.println(F("Are you using a module that expects 3.3v logic? You might need to do logic convertion on Arduio's TX pin (module's RX pin)."));
+			// check for BT05
+			ble->println("AT");
+			s = ble->readString();
+			if (s.length() == 4 && s.compareTo("OK\r\n") == 0)
+			{
+				Serial.println(F("BT05 detected!")); // An HM-10 clone
+				return BT05;
+			}
+			else if (s.length() == 0)
+			{
+				Serial.println(F("No response received from module."));
+				Serial.println(F("Verify that the module is powered. Is the led blinking?"));
+				Serial.println(F("Check that pins are correctly connected and the right values were entered."));
+				Serial.println(F("Are you using a logic voltage converter for a module that already has such logic on board?"));
+				Serial.println(F("Are you using a module that expects 3.3v logic? You might need to do logic convertion on Arduio's TX pin (module's RX pin)."));
+			}
+			else
+			{
+				Serial.print(F("Unexpected result of length="));
+				Serial.println(s.length());
+				Serial.println(s);
+			}
 		}
 		else
 		{
@@ -208,6 +225,16 @@ void displayMainSettings()
 		doCommandAndEchoResult(("AT+NAME"));
 		doCommandAndEchoResult(("AT+PASS"));
 		doCommandAndEchoResult(("AT+ADDR"));
+		doCommandAndEchoResult(("AT+ROLE"));
+		doCommandAndEchoResult(("AT+POWE"), F("0 = -23dbm, 1 = -6dbm, 2 = 0dbm, 3 = 6dbm"));
+	}
+	else if (moduleType == BT05)
+	{
+		doCommandAndEchoResult(("AT+HELP"));
+		doCommandAndEchoResult(("AT+VERSION"));
+		doCommandAndEchoResult(("AT+NAME"));
+		doCommandAndEchoResult(("AT+PIN"));
+		doCommandAndEchoResult(("AT+LADDR"));
 		doCommandAndEchoResult(("AT+ROLE"));
 		doCommandAndEchoResult(("AT+POWE"), F("0 = -23dbm, 1 = -6dbm, 2 = 0dbm, 3 = 6dbm"));
 	}
@@ -301,12 +328,7 @@ String readString(const __FlashStringHelper * message, const __FlashStringHelper
 
 void doCommandAndEchoResult(const char * command, const __FlashStringHelper * meaning)
 {
-	if (moduleType == HM10)
-		ble->print(command);
-	else
-		ble->println(command);
-	String s = ble->readString();
-
+	// announce command
 	Serial.print(F("Sending command: "));
 	Serial.print(command);
 	if (meaning != NULL)
@@ -316,10 +338,22 @@ void doCommandAndEchoResult(const char * command, const __FlashStringHelper * me
 		Serial.print(F(")"));
 	}
 	Serial.println();
+
+	// send command
 	if (moduleType == HM10)
-		Serial.println(s);
+		ble->print(command);
 	else
-		Serial.print(s);
+		ble->println(command);
+
+	// read and return response
+	// don't use "readString", it can't handle long and slow responses (such as AT+HELP) well
+	byte b;
+	while (ble->readBytes(&b, 1) == 1) // use "readBytes" and not "read" due to the timeout support 
+		Serial.write(b);
+
+	// normalize line end
+	if (moduleType == HM10)
+		Serial.println();
 }
 
 void loop()
