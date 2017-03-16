@@ -14,11 +14,11 @@
 // misc
 #define SERIAL_BAUD 9600
 #define SERIAL_TIMEOUT 60000 // 1 min
-#define BLE_BAUD 9600 // for at mode and for data mode (CC41, HM-10 and BT05)
-#define BLE_TIMEOUT 250 // 100 was ok for CC41 and HM-10 but not for BT05's AT+HELP command
+#define BLE_BAUD 9600 // for at mode and for data mode (CC41, HM-10 and MLT-BT05)
+#define BLE_TIMEOUT 250 // 100 was ok for CC41 and HM-10 but not for MLT_BT05's AT+HELP command
 #define INITIAL_DELAY 200
 
-enum ModuleType { HM10, CC41, BT05, Unknown };
+enum ModuleType { HM10, CC41, MLT_BT05, Unknown };
 enum Operation {Quit, SetName, SetPass, SetStateBehavior, SetPower, DisplayMainSettings};
 
 /// State
@@ -165,13 +165,13 @@ ModuleType identifyDevice()
 		}
 		else if (s.length() == 0)
 		{
-			// check for BT05
+			// check for MLT_BT05
 			ble->println("AT");
 			s = ble->readString();
 			if (s.length() == 4 && s.compareTo("OK\r\n") == 0)
 			{
-				Serial.println(F("BT05 detected!")); // An HM-10 clone
-				return BT05;
+				Serial.println(F("MLT-BT05 detected!")); // An HM-10 clone
+				return MLT_BT05;
 			}
 			else if (s.length() == 0)
 			{
@@ -228,7 +228,7 @@ void displayMainSettings()
 		doCommandAndEchoResult(("AT+ROLE"));
 		doCommandAndEchoResult(("AT+POWE"), F("0 = -23dbm, 1 = -6dbm, 2 = 0dbm, 3 = 6dbm"));
 	}
-	else if (moduleType == BT05)
+	else if (moduleType == MLT_BT05)
 	{
 		doCommandAndEchoResult(("AT+HELP"));
 		doCommandAndEchoResult(("AT+VERSION"));
