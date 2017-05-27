@@ -264,7 +264,7 @@ void setName()
 void setPass()
 {
 	String val = readString(F("Enter new pass/pin"), F("000000"));
-	String command(F("AT+PASS"));
+	String command(moduleType ==MLT_BT05? F("AT+PIN") : F("AT+PASS"));
 	command += val;
 	doCommandAndEchoResult(command.c_str());
 }
