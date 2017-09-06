@@ -12,7 +12,7 @@
 #define STATE_PIN_MISSING -1
 
 // misc
-#define SERIAL_BAUD 9600
+#define SERIAL_BAUD 115200
 #define SERIAL_TIMEOUT 60000 // 1 min
 #define BLE_BAUD 9600 // for at mode and for data mode (CC41, HM-10 and MLT-BT05)
 #define BLE_TIMEOUT 250 // 100 was ok for CC41 and HM-10 but not for MLT_BT05's AT+HELP command
