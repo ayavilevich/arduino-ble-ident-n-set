@@ -1,14 +1,22 @@
 // Arduino BLE module identification and setup sketch
 // Copyright, Arik Yavilevich
 
+#ifdef __AVR__ // supports modules conencted over software serial
 #include <SoftwareSerial.h>
+#endif
 
 /// Consts
 
 // BLE module default pins
+#ifdef ESP32
+#define RX_PIN 16
+#define TX_PIN 17
+#define STATE_PIN 5
+#else
 #define RX_PIN 8
 #define TX_PIN 9
 #define STATE_PIN 7
+#endif
 #define STATE_PIN_MISSING -1
 
 // misc
@@ -19,16 +27,24 @@
 #define INITIAL_DELAY 200
 
 enum ModuleType { HM10, CC41, MLT_BT05, Unknown };
-enum Operation {Quit, SetName, SetPass, SetStateBehavior, SetPower, DisplayMainSettings};
+enum Operation {Quit, SetName, SetPass, SetStateBehavior, SetPower, DisplayMainSettings, ReIdentifyDevice, DetermineConnectionState};
+enum ConnectionState {NoStatePin, Blinking, Connected, Disconnected};
+
+// Support hardware serials and predefined serials
+#ifdef ESP32
+HardwareSerial Serial2(2);
+#define SPECIAL_SERIAL Serial2
+#endif
 
 /// State
-SoftwareSerial * ble = NULL; // supports modules conencted over software serial. no current support for Serial2, etc.
+Stream * ble = NULL; // common interface of hardware/software serial
 int rxPin, txPin, statePin;
 ModuleType moduleType;
 
 /// Special functions
 // define here due to custom return type
 ModuleType identifyDevice();
+ConnectionState getConnectionState();
 void doCommandAndEchoResult(const char * command, const __FlashStringHelper * meaning = NULL);
 Operation getMenuSelection();
 
@@ -51,7 +67,7 @@ void setup()
 		do
 		{
 			openBLE();
-		} while (determineConnectionState() == false);
+		} while (determineInitialConnectionState() == false);
 	} while ((moduleType=identifyDevice()) == Unknown);
 	displayMainSettings();
 	do
@@ -73,6 +89,12 @@ void setup()
 			break;
 		case DisplayMainSettings:
 			displayMainSettings();
+			break;
+		case ReIdentifyDevice:
+			moduleType = identifyDevice();
+			break;
+		case DetermineConnectionState:
+			printConnectionState();
 			break;
 		default:
 			Serial.println(F("Quitting. Sketch ended."));
@@ -98,48 +120,97 @@ void openBLE()
 	Serial.println();
 
 	// open and create object
+#ifndef SPECIAL_SERIAL
 	if (ble)
 		delete ble;
-	ble = new SoftwareSerial(rxPin, txPin);
-	ble->begin(BLE_BAUD);
+	SoftwareSerial * ss = new SoftwareSerial(rxPin, txPin);
+	ss->begin(BLE_BAUD);
+	ble = ss;
+#else
+	ble = &SPECIAL_SERIAL;
+	SPECIAL_SERIAL.begin(BLE_BAUD, SERIAL_8N1, rxPin, txPin);
+#endif
 	ble->setTimeout(BLE_TIMEOUT);
 	if(statePin!=STATE_PIN_MISSING)
 		pinMode(statePin, INPUT);
 }
 
-bool determineConnectionState()
+ConnectionState getConnectionState()
+{
+	if (statePin == STATE_PIN_MISSING)
+		return NoStatePin;
+
+	// read state
+	int state = digitalRead(statePin);
+	// check if state is "blinking"
+	unsigned long p1 = pulseIn(statePin, HIGH, 2000000);
+	unsigned long p2 = pulseIn(statePin, LOW, 2000000);
+	if (p1 == p2 && p1 == 0) // if no pulse detected
+	{
+		if (state == HIGH)
+			return Connected;
+		else
+			return Disconnected;
+	}
+	
+	return Blinking;
+}
+
+// perform initial connection state detection including sending user messages/instructions
+// returns true is can detect that the device is in data mode
+// returns false if can't dtermine or if in command mode
+bool determineInitialConnectionState()
 {
 	if (statePin != STATE_PIN_MISSING)
-	{
 		Serial.println(F("Checking module state..."));
-		// read state
-		int state = digitalRead(statePin);
-		// check if state is "blinking"
-		unsigned long p1 = pulseIn(statePin, HIGH, 2000000);
-		unsigned long p2 = pulseIn(statePin, LOW, 2000000);
-		if (p1 == p2 && p1 == 0)
-		{
-			if (state == HIGH)
-			{
-				Serial.println(F("The signal on the state pin is HIGH. This means the device is connected and is in data mode. Sketch can't proceed."));
-				return false;
-			}
-			else
-				Serial.println(F("The signal on the state pin is LOW. This means the device is not connected and is in command mode."));
-		}
-		else // blinking
-		{
-			Serial.println(F("The signal on the state pin is \"blinking\". This usually means the device is not connected and is in command mode."));
-			Serial.println(F("Consider reconfiguring the device to pass the state as-is. So it is simple to detect the state."));
-		}
-	}
-	else
+
+	switch (getConnectionState()) 
 	{
+	case Connected:
+		Serial.println(F("The signal on the state pin is HIGH. This means the device is connected and is in data mode. Sketch can't proceed."));
+		return false;
+	case Disconnected:
+		Serial.println(F("The signal on the state pin is LOW. This means the device is not connected and is in command mode."));
+		break;
+	case Blinking:
+		Serial.println(F("The signal on the state pin is \"blinking\". This usually means the device is not connected and is in command mode."));
+		Serial.println(F("Consider reconfiguring the device to pass the state as-is. So it is simple to detect the state."));
+		break;
+	case NoStatePin:
 		Serial.println(F("For this sketch, make sure the module is not connected to another BLE device."));
 		Serial.println(F("This will make sure the device is in command mode."));
 		Serial.println(F("A led on the module should be off or blinking."));
+		break;
+	default:
+		Serial.println(F("Unknown connection state."));
+		break;
 	}
+
 	return true;
+}
+
+void printConnectionState()
+{
+	Serial.println(F("Checking module state..."));
+	switch (getConnectionState())
+	{
+	case Connected:
+		Serial.println(F("The signal on the state pin is HIGH. This means the device is connected and is in data mode. Can not send commands."));
+		break;
+	case Disconnected:
+		Serial.println(F("The signal on the state pin is LOW. This means the device is not connected and is in command mode."));
+		break;
+	case Blinking:
+		Serial.println(F("The signal on the state pin is \"blinking\". This usually means the device is not connected and is in command mode."));
+		Serial.println(F("Consider reconfiguring the device to pass the state as-is. So it is simple to detect the state."));
+		break;
+	case NoStatePin:
+		Serial.println(F("No state pin was defined, can't detect connection state programmatically."));
+		break;
+	default:
+		Serial.println(F("Unknown connection state."));
+		break;
+	}
 }
 
 ModuleType identifyDevice()
@@ -249,6 +320,8 @@ Operation getMenuSelection()
 		Serial.println(F("3) Set module state pin behavior"));
 	Serial.println(F("4) Set module power"));
 	Serial.println(F("5) Display main settings"));
+	Serial.println(F("6) Re-identify module"));
+	Serial.println(F("7) Detect connection state"));
 	int op = readInt(F("Enter menu selection"), 0);
 	return (Operation)(op);
 }
