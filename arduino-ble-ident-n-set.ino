@@ -27,7 +27,7 @@
 #define INITIAL_DELAY 200
 
 enum ModuleType { HM10, CC41, MLT_BT05, Unknown };
-enum Operation {Quit, SetName, SetPass, SetStateBehavior, SetPower, DisplayMainSettings, ReIdentifyDevice, DetermineConnectionState};
+enum Operation {Quit, SetName, SetPass, SetStateBehavior, SetPower, SetBindingType, DisplayMainSettings, RestoreDefaults, Reboot, ReIdentifyDevice, DetermineConnectionState};
 enum ConnectionState {NoStatePin, Blinking, Connected, Disconnected};
 
 // Support hardware serials and predefined serials
@@ -87,8 +87,17 @@ void setup()
 		case SetPower:
 			setPower();
 			break;
+		case SetBindingType:
+			setBindingType();
+			break;
 		case DisplayMainSettings:
 			displayMainSettings();
+			break;
+		case RestoreDefaults:
+			restoreDefaults();
+			break;
+		case Reboot:
+			reboot();
 			break;
 		case ReIdentifyDevice:
 			moduleType = identifyDevice();
@@ -286,6 +295,7 @@ void displayMainSettings()
 		doCommandAndEchoResult(("AT+ADDR?"));
 		doCommandAndEchoResult(("AT+ROLE?"), F("Peripheral=0, Central=1"));
 		doCommandAndEchoResult(("AT+POWE?"), F("0 = -23dbm, 1 = -6dbm, 2 = 0dbm, 3 = 6dbm"));
+		doCommandAndEchoResult(("AT+TYPE?"), F("0 = Not need PIN Code, 1 = Auth not need PIN, 2 = Auth with PIN, 3 = Auth and bond"));
 		doCommandAndEchoResult(("AT+MODE?"), F("Transmission Mode=0, PIO collection Mode=1, Remote Control Mode=2"));
 		doCommandAndEchoResult(("AT+PIO1?"), F("Behavior of state pin, Blink on disconnect=0, Off on disconnect=1"));
 	}
@@ -298,6 +308,7 @@ void displayMainSettings()
 		doCommandAndEchoResult(("AT+ADDR"));
 		doCommandAndEchoResult(("AT+ROLE"));
 		doCommandAndEchoResult(("AT+POWE"), F("0 = -23dbm, 1 = -6dbm, 2 = 0dbm, 3 = 6dbm"));
+		doCommandAndEchoResult(("AT+TYPE"), F("0 = No binding, 3 = Do binding (not documented)"));
 	}
 	else if (moduleType == MLT_BT05)
 	{
@@ -308,6 +319,7 @@ void displayMainSettings()
 		doCommandAndEchoResult(("AT+LADDR"));
 		doCommandAndEchoResult(("AT+ROLE"));
 		doCommandAndEchoResult(("AT+POWE"), F("0 = -23dbm, 1 = -6dbm, 2 = 0dbm, 3 = 6dbm"));
+		doCommandAndEchoResult(("AT+TYPE"), F("0 = No password, 1 = Password pairing, 2 = Password pairing and binding, 3 = Not documented"));
 	}
 }
 
@@ -319,9 +331,12 @@ Operation getMenuSelection()
 	if(moduleType==HM10)
 		Serial.println(F("3) Set module state pin behavior"));
 	Serial.println(F("4) Set module power"));
-	Serial.println(F("5) Display main settings"));
-	Serial.println(F("6) Re-identify module"));
-	Serial.println(F("7) Detect connection state"));
+	Serial.println(F("5) Set module binding type"));
+	Serial.println(F("6) Display main settings"));
+	Serial.println(F("7) Restore default settings"));
+	Serial.println(F("8) Reboot/reset/restart"));
+	Serial.println(F("9) Re-identify module"));
+	Serial.println(F("10) Detect connection state"));
 	int op = readInt(F("Enter menu selection"), 0);
 	return (Operation)(op);
 }
@@ -357,6 +372,24 @@ void setPower()
 	String command(F("AT+POWE"));
 	command += dbm;
 	doCommandAndEchoResult(command.c_str());
+}
+
+void setBindingType()
+{
+	int dbm = readInt(F("Enter new module binding type (options depend on module, see printout of main settings)"), 0); // 0 is the default
+	String command(F("AT+TYPE"));
+	command += dbm;
+	doCommandAndEchoResult(command.c_str());
+}
+
+void restoreDefaults()
+{
+	doCommandAndEchoResult(moduleType == HM10?"AT+RENEW":"AT+DEFAULT");
+}
+
+void reboot()
+{
+	doCommandAndEchoResult("AT+RESET");
 }
 
 /// Interface helper functions
