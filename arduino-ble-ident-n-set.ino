@@ -105,7 +105,7 @@ void setup()
 		case DetermineConnectionState:
 			printConnectionState();
 			break;
-		default:
+		default: // timeout and no option was selected
 			Serial.println(F("Quitting. Sketch ended."));
 			return;
 		}
