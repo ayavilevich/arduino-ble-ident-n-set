@@ -1,7 +1,7 @@
 // Arduino BLE module identification and setup sketch
 // Copyright, Arik Yavilevich
 
-#ifdef __AVR__ // supports modules conencted over software serial
+#ifdef __AVR__ // supports modules connected over software serial
 #include <SoftwareSerial.h>
 #endif
 
@@ -22,9 +22,9 @@
 // misc
 #define SERIAL_BAUD 115200
 #define SERIAL_TIMEOUT 60000 // 1 min
-#define BLE_BAUD 9600 // for at mode and for data mode (CC41, HM-10 and MLT-BT05)
-#define BLE_TIMEOUT 250 // 100 was ok for CC41 and HM-10 but not for MLT_BT05's AT+HELP command
-#define INITIAL_DELAY 200
+#define BLE_BAUD 9600 // for AT mode and for data mode (CC41, HM-10 and MLT-BT05)
+#define BLE_TIMEOUT 250 // 100ms was ok for CC41 and HM-10 but not for MLT_BT05's AT+HELP command
+#define INITIAL_DELAY 200 // in ms
 
 enum ModuleType { HM10, CC41, MLT_BT05, Unknown };
 enum Operation {Quit, SetName, SetPass, SetStateBehavior, SetPower, SetBindingType, DisplayMainSettings, RestoreDefaults, Reboot, ReIdentifyDevice, DetermineConnectionState};
