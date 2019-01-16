@@ -27,7 +27,7 @@
 #define INITIAL_DELAY 200 // in ms
 
 enum ModuleType { HM10, CC41, MLT_BT05, Unknown };
-enum Operation {Quit, SetName, SetPass, SetStateBehavior, SetPower, SetBindingType, DisplayMainSettings, RestoreDefaults, Reboot, ReIdentifyDevice, DetermineConnectionState};
+enum Operation {Quit, SetName, SetPass, SetStateBehavior, SetPower, SetBindingType, DisplayMainSettings, RestoreDefaults, Reboot, ReIdentifyDevice, DetermineConnectionState, SetRole};
 enum ConnectionState {NoStatePin, Blinking, Connected, Disconnected};
 
 // Support hardware serials and predefined serials
@@ -105,6 +105,9 @@ void setup()
 		case DetermineConnectionState:
 			printConnectionState();
 			break;
+		case SetRole:
+			setRole();
+			break;
 		default: // timeout and no option was selected
 			Serial.println(F("Quitting. Sketch ended."));
 			return;
@@ -161,7 +164,7 @@ ConnectionState getConnectionState()
 		else
 			return Disconnected;
 	}
-	
+
 	return Blinking;
 }
 
@@ -173,7 +176,7 @@ bool determineInitialConnectionState()
 	if (statePin != STATE_PIN_MISSING)
 		Serial.println(F("Checking module state..."));
 
-	switch (getConnectionState()) 
+	switch (getConnectionState())
 	{
 	case Connected:
 		Serial.println(F("The signal on the state pin is HIGH. This means the device is connected and is in data mode. Sketch can't proceed."));
@@ -317,7 +320,7 @@ void displayMainSettings()
 		doCommandAndEchoResult(("AT+NAME"));
 		doCommandAndEchoResult(("AT+PIN"));
 		doCommandAndEchoResult(("AT+LADDR"));
-		doCommandAndEchoResult(("AT+ROLE"));
+		doCommandAndEchoResult(("AT+ROLE"), F("0 = Slave, 1 = Master"));
 		doCommandAndEchoResult(("AT+POWE"), F("0 = -23dbm, 1 = -6dbm, 2 = 0dbm, 3 = 6dbm"));
 		doCommandAndEchoResult(("AT+TYPE"), F("0 = No password, 1 = Password pairing, 2 = Password pairing and binding, 3 = Not documented"));
 	}
@@ -337,6 +340,7 @@ Operation getMenuSelection()
 	Serial.println(F("8) Reboot/reset/restart"));
 	Serial.println(F("9) Re-identify module"));
 	Serial.println(F("10) Detect connection state"));
+	Serial.println(F("11) Set role"));
 	int op = readInt(F("Enter menu selection"), 0);
 	return (Operation)(op);
 }
@@ -371,6 +375,14 @@ void setPower()
 	int dbm = readInt(F("Enter new module power (0 = -23dbm, 1 = -6dbm, 2 = 0dbm, 3 = 6dbm)"), 2); // 2 is the default
 	String command(F("AT+POWE"));
 	command += dbm;
+	doCommandAndEchoResult(command.c_str());
+}
+
+void setRole()
+{
+	int val = readInt(F("Enter new role (0 = Slave, 1 = Master)"), 0); // 0 is the default
+	String command(F("AT+ROLE"));
+	command += val;
 	doCommandAndEchoResult(command.c_str());
 }
 
@@ -454,7 +466,7 @@ void doCommandAndEchoResult(const char * command, const __FlashStringHelper * me
 	// read and return response
 	// don't use "readString", it can't handle long and slow responses (such as AT+HELP) well
 	byte b;
-	while (ble->readBytes(&b, 1) == 1) // use "readBytes" and not "read" due to the timeout support 
+	while (ble->readBytes(&b, 1) == 1) // use "readBytes" and not "read" due to the timeout support
 		Serial.write(b);
 
 	// normalize line end
