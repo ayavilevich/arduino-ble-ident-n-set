@@ -27,7 +27,7 @@
 #define INITIAL_DELAY 200 // in ms
 
 enum ModuleType { HM10, CC41, MLT_BT05, Unknown };
-enum Operation {Quit, SetName, SetPass, SetStateBehavior, SetPower, SetBindingType, DisplayMainSettings, RestoreDefaults, Reboot, ReIdentifyDevice, DetermineConnectionState, SetRole};
+enum Operation {Quit, SetName, SetPass, SetStateBehavior, SetPower, SetBindingType, DisplayMainSettings, RestoreDefaults, Reboot, ReIdentifyDevice, DetermineConnectionState, SetRole, SendCommand};
 enum ConnectionState {NoStatePin, Blinking, Connected, Disconnected};
 
 // Support hardware serials and predefined serials
@@ -107,6 +107,9 @@ void setup()
 			break;
 		case SetRole:
 			setRole();
+			break;
+		case SendCommand:
+			sendCommand();
 			break;
 		default: // timeout and no option was selected
 			Serial.println(F("Quitting. Sketch ended."));
@@ -341,6 +344,7 @@ Operation getMenuSelection()
 	Serial.println(F("9) Re-identify module"));
 	Serial.println(F("10) Detect connection state"));
 	Serial.println(F("11) Set role"));
+	Serial.println(F("12) Send custom command"));
 	int op = readInt(F("Enter menu selection"), 0);
 	return (Operation)(op);
 }
@@ -384,6 +388,12 @@ void setRole()
 	String command(F("AT+ROLE"));
 	command += val;
 	doCommandAndEchoResult(command.c_str());
+}
+
+void sendCommand()
+{
+  String command = readString(F("Enter a command"),F("AT")); // AT is the default
+  doCommandAndEchoResult(command.c_str());
 }
 
 void setBindingType()
