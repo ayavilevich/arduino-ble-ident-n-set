@@ -130,7 +130,7 @@ void openBLE()
   txPin = readInt(F("Enter the number of the TX pin on the Arduino, RX on the module"), TX_PIN);
   statePin = readInt(F("Enter the number of the State pin on the Arduino, State on the module (enter -1 if not present or not connected)"), STATE_PIN);
 
-  ble_baud = readLong(F("Enter the ble baud rate, enter -1 for default "), BLE_BAUD_DEFAULT);
+  ble_baud = readLong(F("Enter the ble baud rate, enter -1 for default"), BLE_BAUD_DEFAULT);
 
   if(ble_baud == -1)
     ble_baud = BLE_BAUD_DEFAULT;
@@ -407,13 +407,13 @@ void setBaud()
   {
     Serial.print("Invalid baud rate selected: ");
     Serial.println(baud);
-    Serial.print("baud must be between 1-9");
+    Serial.println("baud must be between 1-9");
     return;
   }
   String command(F("AT+BAUD"));
   command += baud;
   Serial.println(command.c_str());
-  //doCommandAndEchoResult(command.c_str());
+  doCommandAndEchoResult(command.c_str());
 }
 
 void sendCommand()
